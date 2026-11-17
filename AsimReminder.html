@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- ADD this CSS inside your <style> block -->
+<style>
+  @keyframes marqueeMove {
+    0%   { transform: translateX(100vw); }
+    100% { transform: translateX(-100%); }
+  }
+  .marquee {
+    width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    background: linear-gradient(90deg, #6d28d9, #db2777, #f59e0b);
+    border-radius: 14px;
+    padding: 14px 0;
+    margin-bottom: 18px;
+    box-shadow: 0 0 25px rgba(219, 39, 119, 0.6);
+  }
+  .marquee span {
+    display: inline-block;
+    font-size: 2.6rem;
+    font-weight: 900;
+    color: #fff;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    text-shadow: 0 0 12px #ffd60a, 0 0 24px #ff4d00;
+    animation: marqueeMove 12s linear infinite;
+  }
+  @keyframes bounce {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50%      { transform: translateY(-12px) scale(1.2); }
+  }
+  .bounce-emoji {
+    display: inline-block;
+    font-size: 2.4rem;
+    animation: bounce 1s ease-in-out infinite;
+  }
+</style>
+
+<!-- REPLACE your old <h1> with this whole block -->
+<div class="marquee">
+  <span>🍔🍟 ASIM'S MEAL REMINDER 🍕🌮 EAT, ASIM, EAT! 🍜🍣 DON'T SKIP LUNCH BRO! 🥗🍩 TIME TO CHOW DOWN! 🍇🥤</span>
+</div>
+<div style="margin-bottom: 15px;">
+  <span class="bounce-emoji">🍔</span>
+  <span class="bounce-emoji" style="animation-delay: 0.2s;">🍕</span>
+  <span class="bounce-emoji" style="animation-delay: 0.4s;">🌮</span>
+  <span class="bounce-emoji" style="animation-delay: 0.6s;">🍜</span>
+  <span class="bounce-emoji" style="animation-delay: 0.8s;">🍩</span>
+  <span class="bounce-emoji" style="animation-delay: 1.0s;">🍇</span>
+</div>
+</style>
+</head>
+<body>
+
+<h1>🍽️ Meal Reminder (every 2 hours)</h1>
+<div id="countdown">02:00:00</div>
+<div id="status">Click "Start Reminders" to begin</div>
+
+<button id="startBtn" onclick="startReminders()">▶ Start Reminders</button>
+<button id="testBtn" onclick="triggerAlert(true)">🔔 Test Alarm</button>
+<button id="stopBtn" onclick="stopReminders()">■ Stop</button>
+
+<!-- Popup shown when it's time -->
+<div id="alertBox">
+  <div class="msg">Hey Asim! 🍱</div>
+  <div class="sub">This is your lunch time with a Pomodoro 🍅⏰</div>
+  <button id="dismissBtn" onclick="dismissAlert()">OK, Got it ✓</button>
+</div>
+
+<script>
+  const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+  const MESSAGE = "Hey Asim, this is your lunch time with a pomodoro.";
+
+  let timerId = null;        // reminder interval
+  let countdownId = null;    // countdown updater
+  let blinkId = null;        // screen blink
+  let beepId = null;         // alarm tone loop
+  let audioCtx = null;
+  let nextTime = 0;
+
+  function startReminders() {
+    stopEverything();
+    nextTime = Date.now() + TWO_HOURS_MS;
+    timerId = setInterval(triggerAlert, TWO_HOURS_MS);
+
+    countdownId = setInterval(updateCountdown, 1000);
+    updateCountdown();
+
+    document.getElementById('status').textContent = "Reminders active ✅";
+    document.getElementById('startBtn').style.display = 'none';
+    document.getElementById('stopBtn').style.display = 'inline-block';
+
+    // Warm up audio so browsers allow sound later
+    initAudio();
+  }
+
+  function stopReminders() {
+    stopEverything();
+    document.getElementById('status').textContent = 'Reminders stopped';
+    document.getElementById('startBtn').style.display = 'inline-block';
+    document.getElementById('stopBtn').style.display = 'none';
+    document.getElementById('countdown').textContent = '02:00:00';
+  }
+
+  function updateCountdown() {
+    const remaining = Math.max(0, nextTime - Date.now());
+    const h = String(Math.floor(remaining / 3600000)).padStart(2, '0');
+    const m = String(Math.floor(remaining % 3600000 / 60000)).padStart(2, '0');
+    const s = String(Math.floor(remaining % 60000 / 1000)).padStart(2, '0');
+    document.getElementById('countdown').textContent = `${h}:${m}:${s}`;
+  }
+
+  function triggerAlert(isTest = false) {
+    if (!isTest && nextTime) nextTime = Date.now() + TWO_HOURS_MS;
+
+    speakAndShow();
+    startBlinking();
+    startBeeping();
+  }
+
+  function speakAndShow() {
+    // Speech (optional extra) — announce the message out loud
+    if ('speechSynthesis' in window) {
+      const u = new SpeechSynthesisUtterance(MESSAGE);
+      u.rate = 0.95; u.pitch = 1.1; u.volume = 1;
+      speechSynthesis.speak(u);
+    }
+    document.getElementById('alertBox').style.display = 'block';
+  }
+
+  function dismissAlert() {
+    document.getElementById('alertBox').style.display = 'none';
+    stopBlinking();
+    stopBeeping();
+    if ('speechSynthesis' in window) speechSynthesis.cancel();
+  }
+
+  /* ---------- Screen blinking ---------- */
+  function startBlinking() {
+    let on = false;
+    blinkId = setInterval(() => {
+      on = !on;
+      document.body.style.background = on ? '#ffd60a' : '#111111';
+      document.body.style.color = on ? '#000' : '#fff';
+    }, 400);
+  }
+  function stopBlinking() {
+    clearInterval(blinkId);
+    document.body.style.background = '#1e1e2e';
+    document.body.style.color = '#fff';
+  }
+
+  /* ---------- Alarm tone (repeating beep) ---------- */
+  function initAudio() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+  }
+
+  function beepOnce() {
+    initAudio();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'square';                 // harsher = more alarm-like
+    osc.frequency.value = 880;           // Hz
+    gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.45);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.5);
+  }
+
+  function startBeeping() {
+    beepOnce();
+    beepId = setInterval(beepOnce, 800); // repeating alarm tone
+  }
+  function stopBeeping() {
+    clearInterval(beepId);
+  }
+
+  function stopEverything() {
+    clearInterval(timerId);
+    clearInterval(countdownId);
+    clearInterval(beepId);
+    stopBlinking();
+    document.getElementById('alertBox').style.display = 'none';
+    nextTime = 0;
+  }
+</script>
+
+</body>
+</html>
